@@ -27,7 +27,7 @@ import {
   getSampleCertificate, saveSampleCertificate,
   type SampleCertificateValue,
 } from "@/lib/admin.functions";
-import { createSchoolAdmin, listSchoolAdmins, deleteSchoolAdmin } from "@/lib/school.functions";
+import { createSchoolAdmin, listSchoolAdmins, deleteSchoolAdmin, createSchoolAdminInvitation, listSchoolAdminInvitations, approveSchoolAdminInvitation, listSchoolPaymentReconciliation } from "@/lib/school.functions";
 import { listAltPaymentRequests, markAltPaymentReceived } from "@/lib/alt-payment.functions";
 import { listEnrollmentCertificateIds } from "@/lib/tracking.functions";
 import { getBackendHealth, type HealthState } from "@/lib/health.functions";
@@ -146,8 +146,14 @@ function UserManagementTab() {
   return <div className="flex flex-col gap-10"><section><h2 className="text-xl font-bold text-blue-950 mb-4">Payments</h2><PaymentsTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">Alternative payments</h2><AltPaymentsTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">Users</h2><UsersTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">Credential IDs</h2><CredentialIdsTab /></section></div>;
 }
 
+function SchoolReconciliationTab() {
+  const fetchReport = useServerFn(listSchoolPaymentReconciliation);
+  const { data = [], isLoading } = useQuery({ queryKey: ["school-reconciliation"], queryFn: () => fetchReport() });
+  return <div className="glass-card-light overflow-x-auto p-4"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold text-blue-950">Payment reconciliation</h3><p className="text-sm text-blue-700">Gross, reconciled, and pending school payments.</p></div><Badge variant="outline">{data.length} schools</Badge></div><Table><TableHeader><TableRow><TableHead>School</TableHead><TableHead>Payments</TableHead><TableHead>Gross</TableHead><TableHead>Reconciled</TableHead><TableHead>Pending</TableHead></TableRow></TableHeader><TableBody>{isLoading ? <TableRow><TableCell colSpan={5}>Loading report…</TableCell></TableRow> : data.map((row: any) => <TableRow key={row.school_id}><TableCell className="font-medium">{row.school_name}</TableCell><TableCell>{row.payment_count}</TableCell><TableCell>${Number(row.gross_amount ?? 0).toFixed(2)}</TableCell><TableCell className="text-emerald-700">${Number(row.reconciled_amount ?? 0).toFixed(2)}</TableCell><TableCell className="text-amber-700">${Number(row.pending_amount ?? 0).toFixed(2)}</TableCell></TableRow>)}</TableBody></Table></div>;
+}
+
 function ContractedSchoolsTab() {
-  return <div className="flex flex-col gap-10"><section><h2 className="text-xl font-bold text-blue-950 mb-4">Schools and school payments</h2><SchoolsTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">School administrators, enrolled students and progress</h2><SchoolAdminsTab /></section></div>;
+  return <div className="flex flex-col gap-10"><section><h2 className="text-xl font-bold text-blue-950 mb-4">Schools and school payments</h2><SchoolsTab /></section><section><SchoolReconciliationTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">School administrators, enrolled students and progress</h2><SchoolAdminsTab /></section></div>;
 }
 
 function ProgramsContentTab() {

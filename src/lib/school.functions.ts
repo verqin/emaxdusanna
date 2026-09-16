@@ -515,6 +515,88 @@ export const verifySchoolPayment = createServerFn({ method: "POST" })
     return { success: true, certificateId, receipt };
   });
 
+export const createSchoolAdminInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+.inputValidator((input: { schoolName: string; email: string; fullName?: string; role?: string }) => {
+    const email = (input?.email ?? "").trim().toLowerCase();
+    const schoolName = (input?.schoolName ?? "").trim();
+    if (schoolName.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("School name and valid email are required");
+    const role = input.role === "school_finance" || input.role === "school_viewer" ? input.role : "school_manager";
+    return { schoolName, email, fullName: (input.fullName ?? "").trim().slice(0, 120) || null, role };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: school, error: schoolError } = await supabaseAdmin.from("contracted_schools").select("id, school_name").eq("normalized_name", data.schoolName.toLowerCase()).maybeSingle();
+    if (schoolError) throw schoolError;
+    if (!school) throw new Error("That school is not in the contracted schools list");
+    const token = crypto.randomUUID();
+    const tokenHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    const hash = Array.from(new Uint8Array(tokenHash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: invite, error } = await supabaseAdmin.from("school_admin_invitations").insert({ school_id: school.id, email: data.email, full_name: data.fullName, requested_role: data.role, access_token_hash: hash }).select("id, expires_at").single();
+    if (error) throw error;
+    return { id: invite.id, url: `/school-admin-invite/${token}`, expiresAt: invite.expires_at };
+  });
+
+export const submitSchoolAdminInvitation = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; email: string; fullName: string; phone?: string; role?: string }) => {
+    if (!input?.token || input.token.length < 20) throw new Error("Invalid invitation");
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(input.email)) throw new Error("Valid email is required");
+    if (input.fullName.trim().length < 2) throw new Error("Full name is required");
+    return { ...input, email: input.email.trim().toLowerCase(), fullName: input.fullName.trim().slice(0, 120), phone: (input.phone ?? "").trim().slice(0, 40) || null };
+  })
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data.token));
+    const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { data: invite, error } = await supabaseAdmin.from("school_admin_invitations").select("id, email, status, expires_at").eq("access_token_hash", hash).maybeSingle();
+    if (error) throw error;
+    if (!invite || invite.status !== "pending" || new Date(invite.expires_at) < new Date()) throw new Error("This invitation is unavailable or expired");
+    if (invite.email !== data.email) throw new Error("Use the invited email address");
+    const { error: updateError } = await supabaseAdmin.from("school_admin_invitations").update({ full_name: data.fullName, payload: { phone: data.phone, role: data.role ?? "school_manager" } }).eq("id", invite.id);
+    if (updateError) throw updateError;
+    return { success: true };
+  });
+
+export const listSchoolPaymentReconciliation = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.from("school_payment_reconciliation").select("*").order("gross_amount", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  });
+
+export const listSchoolAdminInvitations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.from("school_admin_invitations").select("id, school_id, email, full_name, requested_role, status, expires_at, submitted_at, created_at, contracted_schools(school_name)").order("created_at", { ascending: false });
+    if (error) throw error;
+    return { invitations: data ?? [] };
+  });
+
+export const approveSchoolAdminInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { invitationId: string }) => { if (!input?.invitationId) throw new Error("Invitation is required"); return input; })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: invite, error } = await supabaseAdmin.from("school_admin_invitations").select("*").eq("id", data.invitationId).single();
+    if (error || !invite || invite.status !== "pending") throw new Error("Invitation is no longer pending");
+    const { data: created, error: authError } = await supabaseAdmin.auth.admin.createUser({ email: invite.email, email_confirm: true, user_metadata: { full_name: invite.full_name, signup_type: "school_admin" } });
+    if (authError || !created.user) throw new Error(authError?.message ?? "Could not create administrator account");
+    const { data: school } = await supabaseAdmin.from("contracted_schools").select("school_name").eq("id", invite.school_id).single();
+    const { error: adminError } = await supabaseAdmin.from("school_admins").insert({ user_id: created.user.id, school_id: invite.school_id, school_name: school?.school_name, contact_name: invite.full_name, created_by: context.userId });
+    if (adminError) { await supabaseAdmin.auth.admin.deleteUser(created.user.id); throw adminError; }
+    await supabaseAdmin.from("user_roles").upsert({ user_id: created.user.id, role: "school_admin" }, { onConflict: "user_id,role" });
+    await supabaseAdmin.from("school_admin_permissions").insert(["manage_roster","view_progress","verify_payments","view_reports","manage_invites"].map((permission) => ({ user_id: created.user.id, school_id: invite.school_id, permission, granted_by: context.userId })));
+    await supabaseAdmin.from("school_admin_invitations").update({ status: "approved", approved_user_id: created.user.id, reviewed_by: context.userId, reviewed_at: new Date().toISOString() }).eq("id", invite.id);
+    return { success: true, userId: created.user.id };
+  });
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
