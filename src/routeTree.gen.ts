@@ -24,6 +24,7 @@ import { Route as AdminGateRouteImport } from './routes/admin-gate'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SchoolAdminInviteTokenRouteImport } from './routes/school-admin-invite/$token'
 import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
 import { Route as CourseIdRouteImport } from './routes/course.$id'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -113,6 +114,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SchoolAdminInviteTokenRoute = SchoolAdminInviteTokenRouteImport.update({
+  id: '/school-admin-invite/$token',
+  path: '/school-admin-invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardUsersRoute = DashboardUsersRouteImport.update({
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/course/$id': typeof CourseIdRoute
   '/dashboard/users': typeof DashboardUsersRoute
+  '/school-admin-invite/$token': typeof SchoolAdminInviteTokenRoute
   '/learn/$courseId/$level': typeof AuthenticatedLearnCourseIdLevelRoute
   '/api/public/cron/purge-retention': typeof ApiPublicCronPurgeRetentionRoute
 }
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/course/$id': typeof CourseIdRoute
   '/dashboard/users': typeof DashboardUsersRoute
+  '/school-admin-invite/$token': typeof SchoolAdminInviteTokenRoute
   '/learn/$courseId/$level': typeof AuthenticatedLearnCourseIdLevelRoute
   '/api/public/cron/purge-retention': typeof ApiPublicCronPurgeRetentionRoute
 }
@@ -288,6 +296,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/course/$id': typeof CourseIdRoute
   '/dashboard/users': typeof DashboardUsersRoute
+  '/school-admin-invite/$token': typeof SchoolAdminInviteTokenRoute
   '/_authenticated/learn/$courseId/$level': typeof AuthenticatedLearnCourseIdLevelRoute
   '/api/public/cron/purge-retention': typeof ApiPublicCronPurgeRetentionRoute
 }
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/course/$id'
     | '/dashboard/users'
+    | '/school-admin-invite/$token'
     | '/learn/$courseId/$level'
     | '/api/public/cron/purge-retention'
   fileRoutesByTo: FileRoutesByTo
@@ -352,6 +362,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/course/$id'
     | '/dashboard/users'
+    | '/school-admin-invite/$token'
     | '/learn/$courseId/$level'
     | '/api/public/cron/purge-retention'
   id:
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/course/$id'
     | '/dashboard/users'
+    | '/school-admin-invite/$token'
     | '/_authenticated/learn/$courseId/$level'
     | '/api/public/cron/purge-retention'
   fileRoutesById: FileRoutesById
@@ -411,6 +423,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   CourseIdRoute: typeof CourseIdRoute
   DashboardUsersRoute: typeof DashboardUsersRoute
+  SchoolAdminInviteTokenRoute: typeof SchoolAdminInviteTokenRoute
   ApiPublicCronPurgeRetentionRoute: typeof ApiPublicCronPurgeRetentionRoute
 }
 
@@ -519,6 +532,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/school-admin-invite/$token': {
+      id: '/school-admin-invite/$token'
+      path: '/school-admin-invite/$token'
+      fullPath: '/school-admin-invite/$token'
+      preLoaderRoute: typeof SchoolAdminInviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/users': {
@@ -675,6 +695,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   CourseIdRoute: CourseIdRoute,
   DashboardUsersRoute: DashboardUsersRoute,
+  SchoolAdminInviteTokenRoute: SchoolAdminInviteTokenRoute,
   ApiPublicCronPurgeRetentionRoute: ApiPublicCronPurgeRetentionRoute,
 }
 export const routeTree = rootRouteImport
