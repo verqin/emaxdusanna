@@ -8,14 +8,31 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+function supabaseUrl(): string | undefined {
+  return process.env["SUPABASE_URL"] || process.env["NEXT_PUBLIC_SUPABASE_URL"];
+}
+
+function supabasePublishableKey(): string | undefined {
+  return process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+    process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ||
+    process.env["SUPABASE_ANON_KEY"] ||
+    process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+}
+
+function supabaseServiceRoleKey(): string | undefined {
+  return process.env["SUPABASE_SERVICE_ROLE_KEY"] ||
+    process.env["SUPABASE_SERVICE_ROLE_SECRET"] ||
+    process.env["SUPABASE_SECRET_KEY"];
+}
+
 export function hasServiceRole(): boolean {
-  return Boolean(process.env["SUPABASE_URL"] && process.env["SUPABASE_SERVICE_ROLE_KEY"]);
+  return Boolean(supabaseUrl() && supabaseServiceRoleKey());
 }
 
 /** Publishable-key server client: RLS applies as the anonymous role. */
 export function publicServerDb() {
-  const url = process.env["SUPABASE_URL"];
-  const key = process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_ANON_KEY"];
+  const url = supabaseUrl();
+  const key = supabasePublishableKey();
   if (!url || !key) throw new Error("Database is not configured on this deployment.");
   return createClient<Database>(url, key, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
