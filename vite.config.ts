@@ -35,6 +35,9 @@ export default defineConfig(({ command }) => ({
       includeAssets: ["favicon.ico", "robots.txt", "logo.webp", "icon-192.png", "icon-512.png", "manifest.webmanifest"],
       manifest: false,
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         navigateFallback: "/",
         navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/_serverFn/],
         runtimeCaching: [

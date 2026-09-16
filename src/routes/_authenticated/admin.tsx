@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { downloadCertificatePdf } from "@/lib/cert-pdf";
 import { useServerFn } from "@tanstack/react-start";
@@ -95,6 +95,7 @@ function AdminPage() {
 }
 
 function AdminContent() {
+  const navigate = useNavigate();
   const fetchStats = useServerFn(getAdminStats);
   const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: () => fetchStats() });
   const { tab } = Route.useSearch();
@@ -110,7 +111,7 @@ function AdminContent() {
       <section className="pt-32 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-black text-blue-900 mb-1">Admin Dashboard</h1>
-          <div className="mb-8 flex flex-wrap items-center justify-between gap-4"><p className="text-blue-600">Manage payments, learners and credentials.</p><div className="flex gap-2"><Link to="/" search={{ hideUsers: false }}><Button variant="outline" size="sm">Review 104,317 users</Button></Link><Link to="/" search={{ hideUsers: true }}><Button variant="outline" size="sm">Hide homepage count</Button></Link></div></div>
+          <div className="mb-8 flex flex-wrap items-center justify-between gap-4"><p className="text-blue-600">Manage payments, learners and credentials.</p><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => { sessionStorage.removeItem("edusanna-hide-user-count"); void navigate({ to: "/" }); }}>Review 104,317 users</Button><Button variant="outline" size="sm" onClick={() => { sessionStorage.setItem("edusanna-hide-user-count", "1"); void navigate({ to: "/" }); }}>Hide homepage count</Button></div></div>
 
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
             <StatCard icon={<Users className="w-5 h-5" />} label="Users" value={stats?.totalUsers ?? "…"} />
