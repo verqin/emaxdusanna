@@ -35,7 +35,7 @@ function AdminGatePage() {
       const result = await checkAdmin();
       if (!result?.isAdmin) {
         await supabase.auth.signOut();
-        throw new Error("This account does not have admin access.");
+        throw new Error("This account is authenticated but is not assigned the admin role.");
       }
 
       toast.success("Welcome back, admin.");
