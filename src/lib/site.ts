@@ -1,5 +1,5 @@
 /** Canonical public origin for absolute SEO URLs. */
-export const SITE_URL = "https://dusanna.vercel.app";
+export const SITE_URL = "https://edusanna.com";
 
 /** Default 1200x630 social sharing card. */
 export const OG_IMAGE = `${SITE_URL}/og-cover.jpg`;

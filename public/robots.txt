@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://dusanna.vercel.app/sitemap.xml
+Sitemap: https://edusanna.com/sitemap.xml

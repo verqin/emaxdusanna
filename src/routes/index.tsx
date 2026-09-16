@@ -22,9 +22,6 @@ export const Route = createFileRoute("/")({
         "Create a free Edusanna account and study 200+ certificate and diploma courses A-Z. Learn free, track your progress, and only pay when you're ready for an official credential.",
       path: "/",
     }),
-  validateSearch: (search: Record<string, unknown>): { hideUsers?: boolean } => ({
-    hideUsers: search.hideUsers === true || search.hideUsers === "true",
-  }),
   component: Index,
 });
 
@@ -106,7 +103,12 @@ function TrustRevealTestimonials({ userCount }: { userCount: number }) {
 }
 
 function Index() {
-  const { hideUsers } = Route.useSearch();
+  const [hideUsers, setHideUsers] = useState(false);
+
+  useEffect(() => {
+    setHideUsers(sessionStorage.getItem("edusanna-hide-user-count") === "1");
+  }, []);
+
   const { data: community } = useQuery({
     queryKey: ["community-stats"],
     queryFn: () => getCommunityStats(),

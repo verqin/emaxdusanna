@@ -5,6 +5,7 @@
  * never inside an iframe, and honor `?sw=off` to unregister stuck workers.
  */
 const SW_PATH = "/sw.js";
+let hasReloadedForControllerChange = false;
 
 function isPreviewHost(host: string) {
   return (
@@ -45,7 +46,27 @@ export async function registerServiceWorker() {
   }
 
   try {
-    await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
+    const registration = await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
+
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+
+    registration.addEventListener("updatefound", () => {
+      const installing = registration.installing;
+      if (!installing) return;
+      installing.addEventListener("statechange", () => {
+        if (installing.state === "installed" && navigator.serviceWorker.controller) {
+          installing.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
+    });
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hasReloadedForControllerChange) return;
+      hasReloadedForControllerChange = true;
+      window.location.reload();
+    });
   } catch (err) {
     console.warn("[pwa] sw registration failed", err);
   }
