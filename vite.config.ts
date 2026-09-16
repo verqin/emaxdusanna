@@ -3,13 +3,20 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 const isVercel = !!process.env.VERCEL;
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+
+  return {
+  define: {
+    "import.meta.env.SUPABASE_URL": JSON.stringify(env.SUPABASE_URL),
+    "import.meta.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(env.SUPABASE_PUBLISHABLE_KEY),
+  },
   css: { transformer: "lightningcss" },
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
@@ -71,4 +78,5 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
-}));
+  };
+});
