@@ -754,9 +754,9 @@ function VerifyPaymentTab() {
     <div className="glass-card-light p-5 max-w-2xl space-y-4">
       <div>
         <h3 className="font-bold text-blue-900">Verify a cash payment</h3>
-        <p className="text-sm text-blue-600">
-          A student paid you at school reception. Verify it here to issue their credential and notify Edusanna admin instantly.
-        </p>
+  <p className="text-sm text-blue-600">
+  Confirm a student&apos;s payment at school reception. Approval creates an official receipt immediately in that student&apos;s Academia dashboard and notifies Edusanna admin.
+  </p>
       </div>
 
       <div>

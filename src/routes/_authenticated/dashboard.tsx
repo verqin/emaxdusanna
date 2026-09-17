@@ -224,7 +224,10 @@ function Dashboard() {
                     >
                       <div className="font-bold text-blue-900">{String(row.course_name ?? "Credential")}</div>
                       <div className="mt-1 text-sm capitalize text-blue-600">{String(row.certificate_type)} · ${Number(row.amount ?? 0).toFixed(2)}</div>
-                      <div className="mt-2 text-xs font-semibold text-emerald-700">View and download receipt</div>
+                      <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                        <span className="font-semibold text-emerald-700">Approved by school</span>
+                        <span className="text-emerald-600">View and download</span>
+                      </div>
                     </button>
                   ))}
                 </div>
