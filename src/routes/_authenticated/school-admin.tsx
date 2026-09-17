@@ -84,10 +84,10 @@ function SchoolAdminPage() {
     );
   }
 
-  return <Content schoolName={data.schoolAdmin.school_name as string} contactName={data.schoolAdmin.contact_name as string | null} />;
+  return <Content schoolName={data.schoolAdmin.school_name as string} schoolCode={data.schoolAdmin.school_code as string | null} contactName={data.schoolAdmin.contact_name as string | null} />;
 }
 
-function Content({ schoolName, contactName }: { schoolName: string; contactName: string | null }) {
+function Content({ schoolName, schoolCode, contactName }: { schoolName: string; schoolCode: string | null; contactName: string | null }) {
   return (
     <div className="min-h-screen">
       <SiteNavbar />
@@ -100,7 +100,7 @@ function Content({ schoolName, contactName }: { schoolName: string; contactName:
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-black text-blue-900 leading-tight">{schoolName}</h1>
-              <p className="text-blue-600 text-sm">School admin dashboard{contactName ? ` - ${contactName}` : ""}</p>
+              <p className="text-blue-600 text-sm">School admin dashboard{contactName ? ` - ${contactName}` : ""}</p><div className="mt-2 inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold tracking-wide text-sky-800"><span className="h-2 w-2 rounded-full bg-sky-500" aria-hidden="true" />Contracted school ID: {schoolCode ?? "Pending"}</div>
             </div>
             <Link to="/settings" className="ml-auto shrink-0">
               <Button variant="outline" className="min-h-11 border-blue-200 text-blue-700 hover:bg-blue-50">

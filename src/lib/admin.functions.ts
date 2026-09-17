@@ -341,7 +341,7 @@ export const listContractedSchools = createServerFn({ method: "GET" })
     const supabaseAdmin = await adminDb(context);
     const { data, error } = await supabaseAdmin
       .from("contracted_schools")
-      .select("id, name, created_at")
+      .select("id, name, school_name, school_code, onboarding_enabled, created_at")
       .order("name", { ascending: true });
     if (error) throw error;
     return { schools: data ?? [] };
