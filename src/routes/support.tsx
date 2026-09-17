@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Mail, MessageCircle, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Mail, MessageCircle, ShieldAlert, Send } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SiteNavbar } from "@/components/site-navbar";
 import { SiteFooter } from "@/components/site-footer";
@@ -11,6 +12,16 @@ export const Route = createFileRoute("/support")({
 });
 
 function SupportPage() {
+  const [topic, setTopic] = useState("Payment support");
+  const [message, setMessage] = useState("");
+
+  const submitSupport = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const subject = encodeURIComponent(topic);
+    const body = encodeURIComponent(message.trim() || "Please describe how Edusanna can help.");
+    window.location.href = `mailto:edusannaonlinelearning@gmail.com?subject=${subject}&body=${body}`;
+  };
+
   return (
     <div className="min-h-screen bg-blue-50/30">
       <SiteNavbar />
@@ -33,7 +44,20 @@ function SupportPage() {
                 <Button variant="outline" className="w-full"><MessageCircle data-icon="inline-start" /> Contact learner support</Button>
               </a>
             </div>
-            <p className="mt-8 text-sm leading-relaxed text-blue-700">When contacting us, include the account email, payment reference, course or credential name, transaction date, and a concise description of the issue. Do not send passwords or full card details.</p>
+            <form onSubmit={submitSupport} className="mt-8 space-y-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-5" aria-labelledby="support-form-title">
+              <div>
+                <h2 id="support-form-title" className="font-bold text-blue-950">Send a support request</h2>
+                <p className="mt-1 text-sm text-blue-700">Complete the form and your email app will open with the request ready to send.</p>
+              </div>
+              <label className="block text-sm font-semibold text-blue-900" htmlFor="support-topic">Topic</label>
+              <select id="support-topic" value={topic} onChange={(event) => setTopic(event.target.value)} className="min-h-11 w-full rounded-lg border border-blue-200 bg-white px-3 text-blue-950">
+                <option>Payment support</option><option>Learner support</option><option>Account access</option><option>Credential support</option>
+              </select>
+              <label className="block text-sm font-semibold text-blue-900" htmlFor="support-message">What do you need help with?</label>
+              <textarea id="support-message" value={message} onChange={(event) => setMessage(event.target.value)} required rows={4} maxLength={2000} className="w-full rounded-lg border border-blue-200 bg-white p-3 text-blue-950" placeholder="Include your account email, payment reference, course, and transaction date." />
+              <Button type="submit" className="bg-blue-700 text-white hover:bg-blue-800"><Send data-icon="inline-start" /> Prepare support email</Button>
+            </form>
+            <p className="mt-5 text-sm leading-relaxed text-blue-700">Do not send passwords or full card details. Support email: <a className="font-semibold underline" href="mailto:edusannaonlinelearning@gmail.com">edusannaonlinelearning@gmail.com</a></p>
           </section>
         </div>
       </main>

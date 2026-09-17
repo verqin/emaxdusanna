@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { BookOpen, GraduationCap, Trophy, ArrowRight, Settings } from "lucide-react";
 import { SiteNavbar } from "@/components/site-navbar";
 import { SiteFooter } from "@/components/site-footer";
@@ -12,6 +13,7 @@ import { getCourseIcon } from "@/lib/course-icons";
 import { getCourseImage } from "@/lib/course-images";
 import { CertificatePreview } from "@/components/certificate-preview";
 import { PriceTag } from "@/components/price-tag";
+import { PaymentReceiptDialog, type PaymentReceipt } from "@/components/payment-receipt";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "My Dashboard | Edusanna" }] }),
@@ -70,6 +72,22 @@ function Dashboard() {
   const enrollments = data?.enrollments ?? [];
   const progress = data?.progress ?? [];
   const completedCount = progress.filter((p) => p.is_completed).length;
+
+  const { data: receipts } = useQuery({
+    queryKey: ["academia-receipts", user?.id],
+    enabled: !!user && profile?.signup_type === "academia",
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("certificate_payments")
+        .select("id, student_name, email, course_name, certificate_type, amount, certificate_id, school_name, class_name, created_at, payment_status")
+        .eq("user_id", user!.id)
+        .in("payment_status", ["noted", "certificate_sent"])
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Array<Record<string, unknown>>;
+    },
+  });
+  const [selectedReceipt, setSelectedReceipt] = useState<PaymentReceipt | null>(null);
 
   const metaName = (user?.user_metadata as { full_name?: string } | undefined)?.full_name;
   const fullName = profile?.full_name || metaName || user?.email?.split("@")[0] || "learner";
@@ -178,6 +196,42 @@ function Dashboard() {
               })}
             </div>
           )}
+
+          {profile?.signup_type === "academia" && (
+            <section className="mt-10 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold text-emerald-950">My approved payment receipts</h2>
+                  <p className="mt-1 text-sm text-emerald-800">Receipts appear here after your school administrator approves payment.</p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-emerald-700">{receipts?.length ?? 0} approved</span>
+              </div>
+              {(receipts?.length ?? 0) > 0 ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {receipts!.map((row) => (
+                    <button
+                      type="button"
+                      key={String(row.id)}
+                      onClick={() => setSelectedReceipt({
+                        receiptNo: `RC-${String(row.certificate_id ?? row.id).replace(/^EDU-SCH-/, "")}`,
+                        issuedAt: String(row.created_at), schoolName: String(row.school_name ?? profile.school_name ?? ""),
+                        className: row.class_name ? String(row.class_name) : null, studentName: String(row.student_name ?? fullName),
+                        email: row.email ? String(row.email) : user?.email, courseName: String(row.course_name ?? "Credential"),
+                        level: row.certificate_type === "diploma" ? "diploma" : "certificate", amount: Number(row.amount ?? 0),
+                        certificateId: String(row.certificate_id ?? "-"), method: "Paid at school",
+                      })}
+                      className="rounded-xl border border-emerald-200 bg-white p-4 text-left transition hover:border-emerald-400 hover:shadow-sm"
+                    >
+                      <div className="font-bold text-blue-900">{String(row.course_name ?? "Credential")}</div>
+                      <div className="mt-1 text-sm capitalize text-blue-600">{String(row.certificate_type)} · ${Number(row.amount ?? 0).toFixed(2)}</div>
+                      <div className="mt-2 text-xs font-semibold text-emerald-700">View and download receipt</div>
+                    </button>
+                  ))}
+                </div>
+              ) : <p className="mt-4 text-sm text-emerald-800">No approved receipts yet.</p>}
+            </section>
+          )}
+          <PaymentReceiptDialog receipt={selectedReceipt} open={!!selectedReceipt} onOpenChange={(open) => !open && setSelectedReceipt(null)} />
 
           <SampleCredentialsMotivation firstName={firstName} />
         </div>
