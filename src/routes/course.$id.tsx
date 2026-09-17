@@ -75,13 +75,15 @@ function CoursePage() {
         { user_id: user.id, course_id: item.id, level, course_title: title },
         { onConflict: "user_id,course_id,level" },
       );
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || "We could not enroll you in this course. Please try again.");
+      }
       if (special) {
         void notifyCourseStarted({ data: { courseId: item.id, courseName: title, level } }).catch(() => {});
       }
       navigate({ to: "/learn/$courseId/$level", params: { courseId: item.id, level } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not enroll");
+      toast.error(err instanceof Error ? err.message : "We could not enroll you in this course. Please try again.");
     } finally {
       setEnrolling(false);
     }
