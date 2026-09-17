@@ -124,10 +124,11 @@ export const getMySchoolAdmin = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data } = await context.supabase
       .from("school_admins")
-      .select("school_name, contact_name, contact_phone")
+      .select("school_name, school_id, contact_name, contact_phone, contracted_schools(school_code)")
       .eq("user_id", context.userId)
       .maybeSingle();
-    return { schoolAdmin: data };
+    const school = Array.isArray(data?.contracted_schools) ? data.contracted_schools[0] : data?.contracted_schools;
+    return { schoolAdmin: data ? { ...data, school_code: school?.school_code ?? null } : data };
   });
 
 /** List the students at this admin's school + their progress, joined by school_name. */
@@ -530,15 +531,16 @@ export const createSchoolAdminInvitation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: school, error: schoolError } = await (supabaseAdmin as any).from("contracted_schools").select("id, school_name").eq("normalized_name", data.schoolName.toLowerCase()).maybeSingle();
+    const { data: school, error: schoolError } = await (supabaseAdmin as any).from("contracted_schools").select("id, school_name, school_code, onboarding_enabled").eq("normalized_name", data.schoolName.toLowerCase()).maybeSingle();
     if (schoolError) throw schoolError;
     if (!school) throw new Error("That school is not in the contracted schools list");
+    if (!school.onboarding_enabled) throw new Error("Onboarding is currently closed for this school. Enable the private page first.");
     const token = crypto.randomUUID();
     const tokenHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
     const hash = Array.from(new Uint8Array(tokenHash)).map((b) => b.toString(16).padStart(2, "0")).join("");
     const { data: invite, error } = await (supabaseAdmin as any).from("school_admin_invitations").insert({ school_id: school.id, email: data.email, full_name: data.fullName, requested_role: data.role, access_token_hash: hash }).select("id, expires_at").single();
     if (error) throw error;
-    return { id: invite.id, url: `/school-admin-invite/${token}`, expiresAt: invite.expires_at };
+    return { id: invite.id, url: `/school-admin-invite/${token}`, expiresAt: invite.expires_at, schoolCode: school.school_code };
   });
 
 export const submitSchoolAdminInvitation = createServerFn({ method: "POST" })
@@ -552,9 +554,11 @@ export const submitSchoolAdminInvitation = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data.token));
     const hash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-    const { data: invite, error } = await (supabaseAdmin as any).from("school_admin_invitations").select("id, email, status, expires_at").eq("access_token_hash", hash).maybeSingle();
+    const { data: invite, error } = await (supabaseAdmin as any).from("school_admin_invitations").select("id, email, status, expires_at, school_id, contracted_schools(onboarding_enabled, school_name, school_code)").eq("access_token_hash", hash).maybeSingle();
     if (error) throw error;
     if (!invite || invite.status !== "pending" || new Date(invite.expires_at) < new Date()) throw new Error("This invitation is unavailable or expired");
+    const school = Array.isArray(invite.contracted_schools) ? invite.contracted_schools[0] : invite.contracted_schools;
+    if (!school?.onboarding_enabled) throw new Error("This private onboarding page is currently closed.");
     if (invite.email !== data.email) throw new Error("Use the invited email address");
     const { error: updateError } = await (supabaseAdmin as any).from("school_admin_invitations").update({ full_name: data.fullName, payload: { phone: data.phone, role: data.role ?? "school_manager" } }).eq("id", invite.id);
     if (updateError) throw updateError;
@@ -569,6 +573,20 @@ export const listSchoolPaymentReconciliation = createServerFn({ method: "GET" })
     const { data, error } = await (supabaseAdmin as any).from("school_payment_reconciliation").select("*").order("gross_amount", { ascending: false });
     if (error) throw error;
     return data ?? [];
+  });
+
+export const setSchoolOnboardingAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { schoolId: string; enabled: boolean }) => {
+    if (!input?.schoolId) throw new Error("School is required");
+    return { schoolId: input.schoolId, enabled: Boolean(input.enabled) };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: school, error } = await (supabaseAdmin as any).from("contracted_schools").update({ onboarding_enabled: data.enabled, onboarding_updated_at: new Date().toISOString() }).eq("id", data.schoolId).select("id, school_name, school_code, onboarding_enabled").single();
+    if (error) throw error;
+    return { school };
   });
 
 export const listSchoolAdminInvitations = createServerFn({ method: "GET" })

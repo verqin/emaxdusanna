@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Users, CreditCard, Award, DollarSign, Clock, ShieldAlert, Loader2, School, FileEdit, Trash2,
-  Activity, CheckCircle2, AlertTriangle, XCircle, RefreshCw,
+  Activity, CheckCircle2, AlertTriangle, XCircle, RefreshCw, Copy,
 } from "lucide-react";
 import { SiteNavbar } from "@/components/site-navbar";
 import { SiteFooter } from "@/components/site-footer";
@@ -27,7 +27,7 @@ import {
   getSampleCertificate, saveSampleCertificate,
   type SampleCertificateValue,
 } from "@/lib/admin.functions";
-import { createSchoolAdmin, listSchoolAdmins, deleteSchoolAdmin, createSchoolAdminInvitation, listSchoolAdminInvitations, approveSchoolAdminInvitation, listSchoolPaymentReconciliation } from "@/lib/school.functions";
+import { createSchoolAdmin, listSchoolAdmins, deleteSchoolAdmin, createSchoolAdminInvitation, listSchoolAdminInvitations, approveSchoolAdminInvitation, setSchoolOnboardingAccess, listSchoolPaymentReconciliation } from "@/lib/school.functions";
 import { listAltPaymentRequests, markAltPaymentReceived } from "@/lib/alt-payment.functions";
 import { listEnrollmentCertificateIds } from "@/lib/tracking.functions";
 import { getBackendHealth, type HealthState } from "@/lib/health.functions";
@@ -153,7 +153,7 @@ function SchoolReconciliationTab() {
 }
 
 function ContractedSchoolsTab() {
-  return <div className="flex flex-col gap-10"><section><h2 className="text-xl font-bold text-blue-950 mb-4">Schools and school payments</h2><SchoolsTab /></section><section><SchoolReconciliationTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">School administrators, enrolled students and progress</h2><SchoolAdminsTab /></section></div>;
+  return <div className="flex flex-col gap-10"><section><h2 className="text-xl font-bold text-blue-950 mb-4">Schools and school payments</h2><SchoolsTab /></section><section><SchoolReconciliationTab /></section><section><h2 className="text-xl font-bold text-blue-950 mb-4">Private school administrator onboarding</h2><SchoolAdminInvitationTab /></section></div>;
 }
 
 function ProgramsContentTab() {
@@ -796,6 +796,52 @@ function SampleCertificateTab() {
       <div><CertificatePreview data={value} /></div>
     </div>
   );
+}
+
+function SchoolAdminInvitationTab() {
+  const qc = useQueryClient();
+  const fetchSchools = useServerFn(listContractedSchools);
+  const fetchInvites = useServerFn(listSchoolAdminInvitations);
+  const createInvite = useServerFn(createSchoolAdminInvitation);
+  const setAccess = useServerFn(setSchoolOnboardingAccess);
+  const approve = useServerFn(approveSchoolAdminInvitation);
+  const { data: schoolData } = useQuery({ queryKey: ["contracted-schools-onboarding"], queryFn: () => fetchSchools() });
+  const { data: inviteData, isLoading } = useQuery({ queryKey: ["school-admin-invitations"], queryFn: () => fetchInvites() });
+  const [schoolId, setSchoolId] = useState("");
+  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState("school_manager");
+  const [result, setResult] = useState<{ url: string; schoolCode: string } | null>(null);
+  const selectedSchool = (schoolData?.schools ?? []).find((school: any) => school.id === schoolId);
+  const mutation = useMutation({
+    mutationFn: () => createInvite({ data: { schoolName: selectedSchool?.school_name ?? selectedSchool?.name ?? "", email, fullName, role } }),
+    onSuccess: (data) => { setResult({ url: data.url, schoolCode: data.schoolCode }); setEmail(""); setFullName(""); qc.invalidateQueries({ queryKey: ["school-admin-invitations"] }); toast.success("Private invitation created"); },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Unable to create invitation"),
+  });
+  const accessMutation = useMutation({
+    mutationFn: (input: { schoolId: string; enabled: boolean }) => setAccess({ data: input }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["contracted-schools-onboarding"] }); toast.success("Onboarding access updated"); },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Unable to update access"),
+  });
+  const approveMutation = useMutation({
+    mutationFn: (invitationId: string) => approve({ data: { invitationId } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["school-admin-invitations"] }); qc.invalidateQueries({ queryKey: ["admin-school-admins"] }); toast.success("Approved: school dashboard created"); },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Approval failed"),
+  });
+  const copy = async (value: string) => { await navigator.clipboard.writeText(`${window.location.origin}${value}`); toast.success("Invitation link copied"); };
+  return <div className="space-y-6">
+    <div className="glass-card-light p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="font-bold text-blue-900">Private school administrator onboarding</h3><p className="text-sm text-blue-600">Open a school-specific invitation page only when you are ready. Submitted details remain pending until approval.</p></div><Badge variant="outline">Approval required</Badge></div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2"><Label htmlFor="invite-school">Contracted school</Label><select id="invite-school" value={schoolId} onChange={(event) => setSchoolId(event.target.value)} className="mt-2 flex h-10 w-full rounded-md border border-blue-200 bg-white px-3 text-sm text-blue-950"><option value="">Select a school</option>{(schoolData?.schools ?? []).map((school: any) => <option key={school.id} value={school.id}>{school.school_name ?? school.name} {school.school_code ? `(${school.school_code})` : ""}</option>)}</select></div>
+        {selectedSchool && <div className="sm:col-span-2 flex items-center justify-between rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900"><span><strong>{selectedSchool.school_code}</strong> private page is {selectedSchool.onboarding_enabled ? "accessible" : "inaccessible"}.</span><Button type="button" size="sm" variant="outline" onClick={() => accessMutation.mutate({ schoolId, enabled: !selectedSchool.onboarding_enabled })}>{selectedSchool.onboarding_enabled ? "Close page" : "Open page"}</Button></div>}
+        <div><Label htmlFor="invite-admin-name">Administrator name</Label><Input id="invite-admin-name" value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Full name" /></div><div><Label htmlFor="invite-admin-email">Administrator email</Label><Input id="invite-admin-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@school.edu" /></div>
+        <div><Label htmlFor="invite-admin-role">Permission level</Label><select id="invite-admin-role" value={role} onChange={(event) => setRole(event.target.value)} className="mt-2 flex h-10 w-full rounded-md border border-blue-200 bg-white px-3 text-sm text-blue-950"><option value="school_manager">School manager</option><option value="school_finance">School finance</option><option value="school_viewer">School viewer</option></select></div>
+      </div><Button className="premium-button mt-4" disabled={!selectedSchool?.onboarding_enabled || !email || !fullName || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Create private invitation</Button>
+      {result && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><p className="font-semibold">Invitation ready for {result.schoolCode}</p><div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center"><code className="min-w-0 flex-1 truncate rounded bg-white px-2 py-1">{window.location.origin}{result.url}</code><Button type="button" size="sm" variant="outline" onClick={() => copy(result.url)}><Copy className="mr-1 h-4 w-4" />Copy link</Button></div></div>}
+    </div>
+    <div className="glass-card-light overflow-x-auto p-4"><h3 className="mb-3 font-bold text-blue-900">Approval queue</h3>{isLoading ? <p className="py-4 text-blue-500">Loading invitations...</p> : <Table><TableHeader><TableRow><TableHead>School</TableHead><TableHead>Applicant</TableHead><TableHead>Permission</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader><TableBody>{(inviteData?.invitations ?? []).map((invite: any) => <TableRow key={invite.id}><TableCell><div className="font-medium text-blue-900">{invite.contracted_schools?.school_name ?? "-"}</div><div className="text-xs text-sky-700">{invite.contracted_schools?.school_code ?? ""}</div></TableCell><TableCell><div>{invite.full_name ?? "-"}</div><div className="text-xs text-blue-500">{invite.email}</div></TableCell><TableCell className="capitalize">{String(invite.requested_role).replace("school_", "")}</TableCell><TableCell><Badge variant={invite.status === "approved" ? "default" : "secondary"}>{invite.status}</Badge></TableCell><TableCell>{invite.status === "pending" ? <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => approveMutation.mutate(invite.id)} disabled={approveMutation.isPending}>Approve &amp; create dashboard</Button> : <span className="text-xs text-blue-500">Reviewed</span>}</TableCell></TableRow>)}</TableBody></Table>}</div>
+  </div>;
 }
 
 function SchoolAdminsTab() {
